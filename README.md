@@ -22,3 +22,8 @@ We manually test the functionality of this bootstrap under the following cases:
 * running `bootstrap.py` as-is, without additional command-line paramaters
 * running `bootstrap.py` with providing download-base and setup-source, and making sure that bootstrap succeed without accessing the interneet
 * running `bootstrap.py` with providing download-base and setup-source and index-url, and making sure that bootstrap succeed without accessing the interneet
+
+Currently, we're testing against:
+* https://pypi.python.org/packages/source/s/setuptools/setuptools-0.8.tar.gz
+* https://pypi.python.org/packages/source/s/setuptools/setuptools-0.7.2.tar.gz
+* https://pypi.python.org/packages/source/z/zc.buildout/zc.buildout-2.2.0.tar.gz
