@@ -98,6 +98,12 @@ options, args = parser.parse_args()
 # load/install setuptools
 
 to_reload = False
+import glob
+import re
+try:
+    from urlparse import urlparse
+except ImportError:
+    from urllib.parse import urlparse
 try:
     import pkg_resources
     import setuptools
@@ -114,6 +120,14 @@ except ImportError:
     setup_args = dict(to_dir=tmpeggs, download_delay=0)
     if options.download_base:
         setup_args['download_base'] = options.download_base
+        if options.download_base.startswith("file://"):
+            download_base = urlparse(options.download_base).path
+            if os.path.exists(download_base):
+                files = glob.glob(os.path.join(download_base, "setuptools-*.tar.gz"))
+                if len(files) == 1:
+                    setuptools_version = re.match("setuptools-(?P<version>.*).tar.gz",
+                                                  os.path.basename(files[0])).groupdict()['version']
+                    setup_args['version'] = setuptools_version
     ez['use_setuptools'](**setup_args)
 
     if to_reload:
