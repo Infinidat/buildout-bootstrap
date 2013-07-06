@@ -41,7 +41,7 @@ this script from going over the network.
 
 def normalize_to_url(option, opt_str, value, parser):
     # copied from zc.buildout-1.x bootstrap.py
-    from urllibi import pathname2url
+    from urllib import pathname2url
     if value:
         if '://' not in value:  # It doesn't smell like a URL.
             value = 'file://%s' % (
@@ -55,7 +55,9 @@ def normalize_to_url(option, opt_str, value, parser):
     name = opt_str[2:].replace('-', '_')
     setattr(parser.values, name, value)
 
-setuptools_source = 'https://bitbucket.org/pypa/setuptools/raw/0.7.2/ez_setup.py'
+ezsetup_source = 'https://bitbucket.org/pypa/setuptools/raw/0.7.2/ez_setup.py'
+setuptools_source = "https://pypi.python.org/packages/source/s/setuptools/"
+pypi_index = "https://pypi.python.org/simple/"
 
 parser = OptionParser(usage=usage)
 parser.add_option("-v", "--version", help="use a specific zc.buildout version")
@@ -78,12 +80,17 @@ parser.add_option("-f", "--find-links",
 parser.add_option("--setup-source", action="callback", dest="setup_source",
                   callback=normalize_to_url, nargs=1, type="string",
                   help=("Specify a URL or file location for the setuptool's ez_setup.py"),
-                  default=setuptools_source)
-# in closed networks, one needs to provide the location of the buildout and setuptools archives
+                  default=ezsetup_source)
+# in closed networks, one needs to provide the location of the setuptools and buildout archives
 parser.add_option("--download-base", action="callback", dest="download_base",
                   callback=normalize_to_url, nargs=1, type="string",
-                  help=("Specify a URL or directory for downloading "
-                        "zc.buildout and setuptools; defaults to PyPI"))
+                  help=("Specify a URL or directory for downloading setuptools and buildout"),
+                  default=setuptools_source)
+# in closed networks, one needs to provide an index server to find buildout on
+parser.add_option("--index-url", action="callback", dest="index_url",
+                  callback=normalize_to_url, nargs=1, type="string",
+                  help=("Specify an alternative for PyPI simple index url"),
+                  default=pypi_index)
 
 options, args = parser.parse_args()
 
@@ -135,7 +142,10 @@ find_links = os.environ.get(
     )
 if find_links:
     cmd.extend(['-f', find_links])
-
+if options.download_base:
+    cmd.extend(["-f", options.download_base])
+if options.index_url:
+    cmd.extend(["-i", options.index_url])
 setuptools_path = ws.find(
     pkg_resources.Requirement.parse('setuptools')).location
 
@@ -152,11 +162,13 @@ if version is None and not options.accept_buildout_test_releases:
                 return False
         return True
     kwargs = dict(search_path=[setuptools_path])
-    if options.download_base:
-        kwargs['index_url'] = options.download_base
+    if options.index_url:
+        kwargs['index_url'] = options.index_url
     index = setuptools.package_index.PackageIndex(**kwargs)
     if find_links:
         index.add_find_links((find_links,))
+    if options.download_base:
+        index.add_find_links((options.download_base,))
     req = pkg_resources.Requirement.parse(requirement)
     if index.obtain(req) is not None:
         best = []
