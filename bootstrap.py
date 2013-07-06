@@ -35,9 +35,27 @@ Bootstraps a buildout-based project.
 Simply run this script in a directory containing a buildout.cfg, using the
 Python that you want bin/buildout to use.
 
-Note that by using --find-links to point to local resources, you can keep 
+Note that by using --find-links to point to local resources, you can keep
 this script from going over the network.
 '''
+
+def normalize_to_url(option, opt_str, value, parser):
+    # copied from zc.buildout-1.x bootstrap.py
+    from urllibi import pathname2url
+    if value:
+        if '://' not in value:  # It doesn't smell like a URL.
+            value = 'file://%s' % (
+                pathname2url(
+                os.path.abspath(os.path.expanduser(value))),)
+        if opt_str == '--download-base' and not value.endswith('/'):
+            # Download base needs a trailing slash to make the world happy.
+            value += '/'
+    else:
+        value = None
+    name = opt_str[2:].replace('-', '_')
+    setattr(parser.values, name, value)
+
+setuptools_source = 'https://bitbucket.org/pypa/setuptools/raw/0.7.2/ez_setup.py'
 
 parser = OptionParser(usage=usage)
 parser.add_option("-v", "--version", help="use a specific zc.buildout version")
@@ -56,7 +74,16 @@ parser.add_option("-c", "--config-file",
                         "file to be used."))
 parser.add_option("-f", "--find-links",
                   help=("Specify a URL to search for buildout releases"))
-
+# in closed networks, one needs to provide the location of ez_setup.py
+parser.add_option("--setup-source", action="callback", dest="setup_source",
+                  callback=normalize_to_url, nargs=1, type="string",
+                  help=("Specify a URL or file location for the setuptool's ez_setup.py"),
+                  default=setuptools_source)
+# in closed networks, one needs to provide the location of the buildout and setuptools archives
+parser.add_option("--download-base", action="callback", dest="download_base",
+                  callback=normalize_to_url, nargs=1, type="string",
+                  help=("Specify a URL or directory for downloading "
+                        "zc.buildout and setuptools; defaults to PyPI"))
 
 options, args = parser.parse_args()
 
@@ -76,9 +103,10 @@ except ImportError:
         from urllib2 import urlopen
 
     # XXX use a more permanent ez_setup.py URL when available.
-    exec(urlopen('https://bitbucket.org/pypa/setuptools/raw/0.7.2/ez_setup.py'
-                ).read(), ez)
+    exec(urlopen(options.setup_source).read(), ez)
     setup_args = dict(to_dir=tmpeggs, download_delay=0)
+    if options.download_base:
+        setup_args['download_base'] = options.download_base
     ez['use_setuptools'](**setup_args)
 
     if to_reload:
@@ -123,8 +151,10 @@ if version is None and not options.accept_buildout_test_releases:
             if (part[:1] == '*') and (part not in _final_parts):
                 return False
         return True
-    index = setuptools.package_index.PackageIndex(
-        search_path=[setuptools_path])
+    kwargs = dict(search_path=[setuptools_path])
+    if options.download_base:
+        kwargs['index_url'] = options.download_base
+    index = setuptools.package_index.PackageIndex(**kwargs)
     if find_links:
         index.add_find_links((find_links,))
     req = pkg_resources.Requirement.parse(requirement)
